@@ -5,39 +5,49 @@ import cv2
 from statistics import mode
 import numpy as np
 from sklearn.cluster import KMeans, MiniBatchKMeans
-
+from sklearn.preprocessing import LabelEncoder
+from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import train_test_split
-from sklearn.neighbors import KNeighborsClassifier
-from sklearn.metrics import accuracy_score
+from sklearn.metrics import accuracy_score, precision_score
 
 
 def read_images(file_path, name):
     try:
-        classes = os.listdir(file_path)
         images_map = []
 
-        for label in classes:
-            label_folder = os.path.join(file_path, label)
-            if os.path.isdir(label_folder):
-                images = os.listdir(os.path.join(file_path, label))
-                for image_name in images:
-                    if image_name.lower().endswith(('.jpg', '.jpeg')):
-                        image_file = os.path.join(label_folder, image_name)
-                        images_map.append((cv2.imread(image_file, cv2.IMREAD_GRAYSCALE), label))
+        if name == "training":
+            classes = os.listdir(file_path)
+            for label in classes:
+                label_folder = os.path.join(file_path, label)
+                if os.path.isdir(label_folder):
+                    images = os.listdir(os.path.join(file_path, label))
+
+                    for image_name in images:
+                        if image_name.lower().endswith(('.jpg', '.jpeg')):
+                            image_file = os.path.join(label_folder, image_name)
+                            images_map.append((cv2.imread(image_file, cv2.IMREAD_GRAYSCALE), label))
+
+        elif name == "testing":
+            images = os.listdir(file_path)
+
+            for image_name in images:
+                if image_name.lower().endswith(('.jpg', '.jpeg')):
+                    image_file = os.path.join(file_path, image_name)
+                    images_map.append((cv2.imread(image_file, cv2.IMREAD_GRAYSCALE), image_name.lower()))
 
         return images_map
     except Exception as e:
         print(f'Error when reading {name} data', e)
 
 
-def check_size_and_scale(data):
+def check_size_and_scale(data, name):
     null = 0
     heights = []
     widths = []
     maxs = []
     mins = []
     scales = []
-    for image, label in data:
+    for image in data:
         if image is not None:
             heights.append(image.shape[0])
             widths.append(image.shape[1])
@@ -47,10 +57,11 @@ def check_size_and_scale(data):
         else:
             null += 1
 
+    print(f"{name} set size and scale information:")
     print("Number of images of type None =", null)
     print(f"Height: mode = {mode(heights)}, min = {min(heights)}, max = {max(heights)}")
     print(f"Width: mode = {mode(widths)}, min = {min(widths)}, max = {max(widths)}")
-    print(f"Scale: average min = {mode(mins)}, average max = {mode(maxs)}, average scale range = {mode(scales) + 1}")
+    print(f"Scale: average min = {mode(mins)}, average max = {mode(maxs)}, average scale range = {mode(scales) + 1} \n")
 
 
 def split_image_into_patches(image, patch_size, sample_frequency):
@@ -109,55 +120,95 @@ def vector_quantisation(vectors, vocab):
     return words
 
 
+def train_classifiers(input_features, targets):
+    classifiers_for_each_label = []
+    classes = set(targets)
+    print(classes)
+
+    for i in range(len(classes)):
+        class_targets = [1 if target == i else 0 for target in targets]
+        print(f"i = {i}, {class_targets}")
+
+        # TODO: choose parameters for this model:
+        logistic_reg = LogisticRegression(max_iter=1000, random_state=42)
+        logistic_reg.fit(input_features, class_targets)
+
+        classifiers_for_each_label.append(logistic_reg)
+
+    return classifiers_for_each_label
+
+
+def make_predictions(input_features, classifiers_for_each_label):
+    predictions_for_each_class = np.zeros((len(input_features), len(classifiers_for_each_label)))
+
+    for i, classifier in enumerate(classifiers_for_each_label):
+        predictions_for_each_class[:, i] = classifier.predict_proba(input_features)[:, 1]
+
+    return np.argmax(predictions_for_each_class, axis=1)
+
+
+def write_predictions_to_file(predicted, file_names, label_encoder):
+    string_predictions = label_encoder.inverse_transform(predicted)
+    with open("run2.txt", 'w') as output_file:
+        for filename, prediction in zip(file_names, string_predictions):
+            output_file.write(f"{filename} {prediction}\n")
 
 
 training_data = read_images(os.path.join("..", "training"), "training")
-check_size_and_scale(training_data)
+testing_data = read_images(os.path.join("..", "testing"), "testing")
+testing_filenames = [filename for image, filename in testing_data]
+check_size_and_scale([image for image, label in training_data], "Training")
+check_size_and_scale([image for image, filename in testing_data], "Testing")
 
-print(training_data[1499][0].shape)
 
 # TODO: maybe try different patch_size and sample_frequency, other than 8 and 4 ?
 training_patches = [(split_image_into_patches(image, 8, 4), label) for image, label in training_data]
-print(training_patches[1499][0].shape)
+testing_patches = [split_image_into_patches(image, 8, 4) for image, filename in testing_data]
+
 
 training_vectors = [(flatten_patches_into_vector(patches), label) for patches, label in training_patches]
-print(training_vectors[1499][0].shape)
+testing_vectors = [flatten_patches_into_vector(patches) for patches in testing_patches]
+
 
 start = time.time()
 vocabulary = learn_vocabulary(training_vectors)
 end = time.time()
 print(f"Clustering took {end - start} seconds.")
-# print(vocabulary)
+
 
 start = time.time()
-quantized_words = [vector_quantisation(vector, vocabulary) for vector, label in training_vectors]
+training_quantized_words = [vector_quantisation(vector, vocabulary) for vector, label in training_vectors]
+testing_quantized_words = [vector_quantisation(vector, vocabulary) for vector in testing_vectors]
 end = time.time()
 print(f"Quantization took {end - start} seconds.")
-# print(quantized_words)
 
-start = time.time()
+
 # Draw a histogram over the visual word counts for each image:
 bins = np.arange(len(vocabulary+1))
-feature_vectors = [np.histogram(word, bins=bins, density=True)[0] for word in quantized_words]
+training_feature_vectors = [np.histogram(word, bins=bins, density=True)[0] for word in training_quantized_words]
+testing_feature_vectors = [np.histogram(word, bins=bins, density=True)[0] for word in testing_quantized_words]
+print(len(training_feature_vectors))
+
+
+labels = [label.lower() for vector, label in training_vectors]
+encoder = LabelEncoder()
+labels_encoded = encoder.fit_transform(labels)
+
+
+# TODO: maybe not 20% for testing ?
+X_train, X_test, y_train, y_test = train_test_split(training_feature_vectors, labels_encoded, test_size=0.2,
+                                                    random_state=42)
+classifiers_for_precision_score = train_classifiers(X_train, y_train)
+predictions_for_precision_score = make_predictions(X_test, classifiers_for_precision_score)
+accuracy = accuracy_score(y_test, predictions_for_precision_score)
+precision = precision_score(y_test, predictions_for_precision_score, average='macro')
+print("Accuracy:", accuracy)
+print("Average Precision:", precision)
+
+
+start = time.time()
+one_vs_all_classifiers = train_classifiers(training_feature_vectors, labels_encoded)
 end = time.time()
-print(f"Histograms took {end - start} seconds.")
-# print(feature_vectors)
-
-
-
-# test_image = np.array([[0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3],
-#                        [0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3],
-#                        [0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3],
-#                        [0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3],
-#                        [4, 4, 4, 4, 5, 5, 5, 5, 6, 6, 6, 6, 7, 7, 7, 7],
-#                        [4, 4, 4, 4, 5, 5, 5, 5, 6, 6, 6, 6, 7, 7, 7, 7],
-#                        [4, 4, 4, 4, 5, 5, 5, 5, 6, 6, 6, 6, 7, 7, 7, 7],
-#                        [4, 4, 4, 4, 5, 5, 5, 5, 6, 6, 6, 6, 7, 7, 7, 7],
-#                        [8, 8, 8, 8, 9, 9, 9, 9, 10, 10, 10, 10, 11, 11, 11, 11],
-#                        [8, 8, 8, 8, 9, 9, 9, 9, 10, 10, 10, 10, 11, 11, 11, 11],
-#                        [8, 8, 8, 8, 9, 9, 9, 9, 10, 10, 10, 10, 11, 11, 11, 11],
-#                        [8, 8, 8, 8, 9, 9, 9, 9, 10, 10, 10, 10, 11, 11, 11, 11],
-#                        [12, 12, 12, 12, 13, 13, 13, 13, 14, 14, 14, 14, 15, 15, 15, 15],
-#                        [12, 12, 12, 12, 13, 13, 13, 13, 14, 14, 14, 14, 15, 15, 15, 15],
-#                        [12, 12, 12, 12, 13, 13, 13, 13, 14, 14, 14, 14, 15, 15, 15, 15],
-#                        [12, 12, 12, 12, 13, 13, 13, 13, 14, 14, 14, 14, 15, 15, 15, 15]])
+print(f"Training classifiers took {end - start} seconds.")
+final_predictions = make_predictions(testing_feature_vectors, one_vs_all_classifiers)
+write_predictions_to_file(final_predictions, testing_filenames, encoder)
