@@ -9,54 +9,80 @@ from sklearn.preprocessing import LabelEncoder
 from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score, precision_score
+import torch
 
 
 def read_images(file_path, name):
+    """
+        Function that reads images from files into numpy arrays
+        :param file_path: Path to folder containing images
+        :param name: either training or testing
+        :return list of pairs in the form (image array, label) for training set and (image array, filename)
+                for testing set
+    """
     try:
-        images_map = []
+        images_list = []
 
+        # If reading files from training dataset:
         if name == "training":
+            # Loop through folders corresponding to each class:
             classes = os.listdir(file_path)
             for label in classes:
                 label_folder = os.path.join(file_path, label)
                 if os.path.isdir(label_folder):
+                    # Loop through images inside each folder:
                     images = os.listdir(os.path.join(file_path, label))
-
                     for image_name in images:
                         if image_name.lower().endswith(('.jpg', '.jpeg')):
+                            # Write the image and its label to the list of pairs:
                             image_file = os.path.join(label_folder, image_name)
-                            images_map.append((cv2.imread(image_file, cv2.IMREAD_GRAYSCALE), label))
+                            images_list.append((cv2.imread(image_file, cv2.IMREAD_GRAYSCALE), label))
 
+        # If reading files from testing dataset:
         elif name == "testing":
             images = os.listdir(file_path)
 
+            # Loop through every image in the testing dataset:
             for image_name in images:
                 if image_name.lower().endswith(('.jpg', '.jpeg')):
+                    # Write the image and its filename to the list of pairs:
                     image_file = os.path.join(file_path, image_name)
-                    images_map.append((cv2.imread(image_file, cv2.IMREAD_GRAYSCALE), image_name.lower()))
+                    images_list.append((cv2.imread(image_file, cv2.IMREAD_GRAYSCALE), image_name.lower()))
 
-        return images_map
+        return images_list
+    # Raise exception if there occurs a problem with reading files:
     except Exception as e:
         print(f'Error when reading {name} data', e)
 
 
+# TODO: maybe remove this function:
 def check_size_and_scale(data, name):
+    """
+        Function that prints size and scale information about images
+        :param data: list of images in the form of numpy arrays
+        :param name: either Training or Testing (used for printing information)
+    """
     null = 0
     heights = []
     widths = []
     maxs = []
     mins = []
     scales = []
+
+    # Loop through every image in the given list:
     for image in data:
         if image is not None:
+            # Store the size and scale information of each image:
             heights.append(image.shape[0])
             widths.append(image.shape[1])
             mins.append(image.min())
             maxs.append(image.max())
             scales.append(image.max() - image.min())
         else:
+            # Count the number of images of type None, if there are any:
             null += 1
 
+    # Print the overall size and scale information of the dataset:
     print(f"{name} set size and scale information:")
     print("Number of images of type None =", null)
     print(f"Height: mode = {mode(heights)}, min = {min(heights)}, max = {max(heights)}")
@@ -65,6 +91,14 @@ def check_size_and_scale(data, name):
 
 
 def split_image_into_patches(image, patch_size, sample_frequency):
+    """
+        Function that splits an image into patches
+        :param image: the image to split
+        :param patch_size: the resulting patches will be N*N, where N is the patch_size
+        :param sample_frequency: image will be sampled every N pixels in x and y directions,
+                                 where N is the sample_frequency
+        :return list of patches for the image
+    """
     patches = []
 
     rows_max = image.shape[0] - patch_size
@@ -72,18 +106,30 @@ def split_image_into_patches(image, patch_size, sample_frequency):
 
     for row in range(0, rows_max + 1, sample_frequency):
         for col in range(0, cols_max + 1, sample_frequency):
+            # Extract a patch from the image:
             patch = image[row: row + patch_size, col: col + patch_size]
+            # Ignore right and bottom patches that do not result in desired size:
             if patch.shape[0] == patch_size and patch.shape[1] == patch_size:
+                # Store the patch in the list of patches:
                 patches.append(patch)
 
     return np.array(patches)
 
 
 def flatten_patches_into_vector(patches):
+    """
+        Function that flattens patches into vectors, mean-centers and normalizes them
+        :param patches: list of patches of an image
+        :return list of flattened, normalized and mean-centered vectors
+    """
+
+    # Flatten the patches into vectors:
     flattened = np.array([patch.flatten() for patch in patches])
 
+    # Mean-center each flattened vector:
     mean_centered = flattened - np.mean(flattened, keepdims=True, axis=1)
 
+    # Normalize each flattened vector:
     l2_norms_list = np.linalg.norm(mean_centered, keepdims=True, axis=1)
     l2_norms_list = np.where(l2_norms_list == 0, 1, l2_norms_list)
     normalized = mean_centered / l2_norms_list
@@ -92,28 +138,42 @@ def flatten_patches_into_vector(patches):
 
 
 def learn_vocabulary(data):
+    """
+        Function that performs K-Means clustering and to create the visual vocabulary
+        :param data: list of flattened vectors of an image
+        :return the learnt visual vocabulary
+    """
+
+    # Prepare the data for clustering:
     clustering_data = [vector for vector, label in data]
     clustering_data_prepared = [patch for vector in clustering_data for patch in vector]
 
     # TODO: this can help reduce execution time
-    # indices = np.random.choice(len(clustering_data_prepared), 10000, replace=False)
+    # Select 10000 random patches to reduce execution time:
+    # indices = np.random.choice(len(clustering_data_prepared), 20000, replace=False)
     # clustering_data_sampled = np.array(clustering_data_prepared)[indices]
 
-    # TODO: try others, maybe 500 is not best ?
     # TODO: choose between MiniBatchKMeans and the sampled method above !!!
+    # Perform the K-Means clustering:
     # k_means = KMeans(n_clusters=500, n_init=10, random_state=0)
-    k_means = MiniBatchKMeans(n_clusters=500, n_init=10, batch_size=1000, random_state=0)
+    k_means = MiniBatchKMeans(n_clusters=150, n_init=10, batch_size=1000, random_state=0)
     k_means.fit(clustering_data_prepared)
 
-    vocab = k_means.cluster_centers_
-    return vocab
+    # Return the learnt visual vocabulary:
+    return k_means.cluster_centers_
 
 
 def vector_quantisation(vectors, vocab):
+    """
+        Function that maps each feature vector to the nearest visual word
+        :param vectors: list of feature vectors
+        :param vocab: vocabulary learnt from training set's images
+        :return list of visual words
+    """
     words = []
 
     for vector in vectors:
-        # Find the closest words:
+        # Find the words closest to each feature vector:
         distances = np.linalg.norm(vocab - vector, axis=1)
         words.append(np.argmin(distances))
 
@@ -121,61 +181,93 @@ def vector_quantisation(vectors, vocab):
 
 
 def train_classifiers(input_features, targets):
+    """
+        Function that trains a one-vs-all classifier for each class
+        :param input_features: list of training input features
+        :param targets: list of correct training labels
+        :return list of classifiers for each class
+    """
     classifiers_for_each_label = []
     classes = set(targets)
-    print(classes)
 
+    # Loop through each class type:
     for i in range(len(classes)):
+        # Set only the current class as the positive class:
         class_targets = [1 if target == i else 0 for target in targets]
-        print(f"i = {i}, {class_targets}")
 
-        # TODO: choose parameters for this model:
+        # Create and train the Logistic Regression model:
         logistic_reg = LogisticRegression(max_iter=1000, random_state=42)
         logistic_reg.fit(input_features, class_targets)
 
+        # Add the trained model to the list of classifiers:
         classifiers_for_each_label.append(logistic_reg)
 
     return classifiers_for_each_label
 
 
 def make_predictions(input_features, classifiers_for_each_label):
+    """
+        Function that receives predictions from each classifier and combines them to determine the most likely class
+        :param input_features: list of testing input features
+        :param classifiers_for_each_label: list of trained classifiers for each class
+        :return final predictions
+    """
     predictions_for_each_class = np.zeros((len(input_features), len(classifiers_for_each_label)))
 
+    # Predict probabilities of whether features belong to each class:
     for i, classifier in enumerate(classifiers_for_each_label):
         predictions_for_each_class[:, i] = classifier.predict_proba(input_features)[:, 1]
 
+    # Return the list of prediction classes with maximum probability:
     return np.argmax(predictions_for_each_class, axis=1)
 
 
 def write_predictions_to_file(predicted, file_names, label_encoder):
+    """
+        Function that writes final predictions to the run2.txt file, as instructed in specification
+        :param predicted: list of predictions
+        :param file_names: list of all file names from the testing dataset
+        :param label_encoder: LabelEncoder object that was used to encode classes (will be used to decode labels
+                              back to string format)
+    """
+    # Transform encoded labels back to string:
     string_predictions = label_encoder.inverse_transform(predicted)
+
+    # Write predictions and file names to the run2.txt file:
     with open("run2.txt", 'w') as output_file:
         for filename, prediction in zip(file_names, string_predictions):
             output_file.write(f"{filename} {prediction}\n")
 
 
+# Read training and testing data from files:
 training_data = read_images(os.path.join("..", "training"), "training")
 testing_data = read_images(os.path.join("..", "testing"), "testing")
 testing_filenames = [filename for image, filename in testing_data]
+
+# Print information about size and scale of images in datasets:
 check_size_and_scale([image for image, label in training_data], "Training")
 check_size_and_scale([image for image, filename in testing_data], "Testing")
 
 
 # TODO: maybe try different patch_size and sample_frequency, other than 8 and 4 ?
+# Split the images into 8 by 8 patches, sampled every 4 pixels in the x and y directions
 training_patches = [(split_image_into_patches(image, 8, 4), label) for image, label in training_data]
 testing_patches = [split_image_into_patches(image, 8, 4) for image, filename in testing_data]
 
 
+# Flatten patches into vectors, mean-center and normalize them:
 training_vectors = [(flatten_patches_into_vector(patches), label) for patches, label in training_patches]
 testing_vectors = [flatten_patches_into_vector(patches) for patches in testing_patches]
 
 
+# Apply K-Means clustering on training data to learn the visual vocabulary:
 start = time.time()
 vocabulary = learn_vocabulary(training_vectors)
 end = time.time()
 print(f"Clustering took {end - start} seconds.")
 
 
+# Map each feature vector to the closest visual word using vocabulary learnt from training data:
 start = time.time()
 training_quantized_words = [vector_quantisation(vector, vocabulary) for vector, label in training_vectors]
 testing_quantized_words = [vector_quantisation(vector, vocabulary) for vector in testing_vectors]
@@ -190,25 +282,33 @@ testing_feature_vectors = [np.histogram(word, bins=bins, density=True)[0] for wo
 print(len(training_feature_vectors))
 
 
+# Encode labels into numerical form:
 labels = [label.lower() for vector, label in training_vectors]
 encoder = LabelEncoder()
 labels_encoded = encoder.fit_transform(labels)
 
 
-# TODO: maybe not 20% for testing ?
+# Split the training dataset (80% for training and 20% for testing) to evaluate the model's performance:
 X_train, X_test, y_train, y_test = train_test_split(training_feature_vectors, labels_encoded, test_size=0.2,
-                                                    random_state=42)
+                                                    random_state=42, stratify=labels_encoded)
 classifiers_for_precision_score = train_classifiers(X_train, y_train)
 predictions_for_precision_score = make_predictions(X_test, classifiers_for_precision_score)
 accuracy = accuracy_score(y_test, predictions_for_precision_score)
-precision = precision_score(y_test, predictions_for_precision_score, average='macro')
+precision = precision_score(y_test, predictions_for_precision_score, average='macro', zero_division=0)
 print("Accuracy:", accuracy)
 print("Average Precision:", precision)
 
 
+# Train a new model on the full training dataset:
 start = time.time()
 one_vs_all_classifiers = train_classifiers(training_feature_vectors, labels_encoded)
 end = time.time()
 print(f"Training classifiers took {end - start} seconds.")
+
+# Make classification predictions on the testing set and write the results to run2.txt:
 final_predictions = make_predictions(testing_feature_vectors, one_vs_all_classifiers)
 write_predictions_to_file(final_predictions, testing_filenames, encoder)
+
+
+os.system('say "your program has finished"')
+
