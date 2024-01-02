@@ -15,7 +15,7 @@ def resize_img(image):
 
 def preprocess_image(image_path):
     with Image.open(image_path) as img:
-    
+
         img_sized = resize_img(img)
         tiny_image = zero_mean_normalize(img_sized)
         return tiny_image
