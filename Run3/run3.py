@@ -29,7 +29,7 @@ feature_vectors = []
 
 
 # Preprocess images and create feature vectors
-feature_vectors = [run3Preprocess_image(i).flatten() for i in links[:500]]
+feature_vectors = [Run3preprocess_image(i).flatten() for i in links[:500]]
 # X = feature_vectors
 
 # Print the shapes of the preprocessed images

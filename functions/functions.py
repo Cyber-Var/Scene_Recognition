@@ -13,6 +13,10 @@ def resize_img(image):
     resized_img = image.resize((16, 16))
     return resized_img
 
+def run3Resize_img(image):
+    resized_img = image.resize((32, 32))
+    return resized_img
+
 def preprocess_image(image_path):
     with Image.open(image_path) as img:
 
@@ -40,14 +44,27 @@ def load_dataset(root_folder):
     return image_paths,labels
 
 
-def run3Preprocess_image(image_path, target_size=(32, 32)):
-    # Load and resize the image
-    img = Image.open(image_path)
+# def run3Preprocess_image(image_path, target_size=(32, 32)):
+#     # Load and resize the image
+#     img = Image.open(image_path)
 
-    img = img.resize(target_size, Image.ANTIALIAS)
+#     img = img.resize(target_size, Image.ANTIALIAS)
     
-    # tiny_image = zero_mean_normalize(img)
-    img_array = np.array(img)
-    return img_array
+#     # tiny_image = zero_mean_normalize(img)
+#     img_array = np.array(img)
+#     return img_array
 
 
+# def run3Resize_img(image_path):
+#     with Image.open(image_path) as img:
+#         resized_img = img.resize((32, 32))
+#         return resized_img
+
+
+def Run3preprocess_image(image_path):
+    with Image.open(image_path) as img:
+
+        img_sized = run3Resize_img(img)
+        img_array = np.array(img_sized)
+        # tiny_image = zero_mean_normalize(img_sized)
+        return img_array
