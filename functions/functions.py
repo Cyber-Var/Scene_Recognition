@@ -40,3 +40,14 @@ def load_dataset(root_folder):
     return image_paths,labels
 
 
+def run3Preprocess_image(image_path, target_size=(32, 32)):
+    # Load and resize the image
+    img = Image.open(image_path)
+
+    img = img.resize(target_size, Image.ANTIALIAS)
+    
+    # tiny_image = zero_mean_normalize(img)
+    img_array = np.array(img)
+    return img_array
+
+
