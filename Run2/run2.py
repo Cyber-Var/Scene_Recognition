@@ -116,25 +116,33 @@ def split_image_into_patches(image, patch_size, sample_frequency):
     return np.array(patches)
 
 
+def normalize_and_mean_center_patches(patches):
+    """
+        Function that mean-centers and normalizes patches
+        :param patches: list of patches of an image
+        :return list of mean-centered and normalized patches
+    """
+    # Mean-center each patch:
+    mean_centered = patches - np.mean(patches, keepdims=True, axis=(1, 2))
+
+    # Normalize each mean-centered patch:
+    l2_norms_list = np.array([np.linalg.norm(p, keepdims=True) for p in mean_centered])
+    l2_norms_list = np.where(l2_norms_list == 0, 1, l2_norms_list)
+    mean_centered_normalized = mean_centered / l2_norms_list
+
+    return mean_centered_normalized
+
+
 def flatten_patches_into_vector(patches):
     """
-        Function that flattens patches into vectors, mean-centers and normalizes them
+        Function that flattens patches of an image into vectors
         :param patches: list of patches of an image
-        :return list of flattened, normalized and mean-centered vectors
+        :return list flattened vectors
     """
 
     # Flatten the patches into vectors:
     flattened = np.array([patch.flatten() for patch in patches])
-
-    # Mean-center each flattened vector:
-    mean_centered = flattened - np.mean(flattened, keepdims=True, axis=1)
-
-    # Normalize each flattened vector:
-    l2_norms_list = np.linalg.norm(mean_centered, keepdims=True, axis=1)
-    l2_norms_list = np.where(l2_norms_list == 0, 1, l2_norms_list)
-    normalized = mean_centered / l2_norms_list
-
-    return normalized
+    return flattened
 
 
 def learn_vocabulary(data):
@@ -249,15 +257,17 @@ check_size_and_scale([image for image, label in training_data], "Training")
 check_size_and_scale([image for image, filename in testing_data], "Testing")
 
 
-# TODO: maybe try different patch_size and sample_frequency, other than 8 and 4 ?
-# Split the images into 8 by 8 patches, sampled every 4 pixels in the x and y directions
-training_patches = [(split_image_into_patches(image, 8, 4), label) for image, label in training_data]
-testing_patches = [split_image_into_patches(image, 8, 4) for image, filename in testing_data]
+# Split the images into 5 by 5 patches, sampled every 5 pixels in the x and y directions:
+training_patches = [(split_image_into_patches(image, 5, 5), label) for image, label in training_data]
+testing_patches = [split_image_into_patches(image, 5, 5) for image, filename in testing_data]
 
+# Mean-center and normalize patches:
+training_mean_centered_normalized = [(normalize_and_mean_center_patches(patches), label) for patches, label in training_patches]
+testing_mean_centered_normalized = [normalize_and_mean_center_patches(patches) for patches in testing_patches]
 
-# Flatten patches into vectors, mean-center and normalize them:
-training_vectors = [(flatten_patches_into_vector(patches), label) for patches, label in training_patches]
-testing_vectors = [flatten_patches_into_vector(patches) for patches in testing_patches]
+# Flatten patches into vectors:
+training_vectors = [(flatten_patches_into_vector(patches), label) for patches, label in training_mean_centered_normalized]
+testing_vectors = [flatten_patches_into_vector(patches) for patches in testing_mean_centered_normalized]
 
 
 # Apply K-Means clustering on training data to learn the visual vocabulary:
@@ -279,7 +289,6 @@ print(f"Quantization took {end - start} seconds.")
 bins = np.arange(len(vocabulary+1))
 training_feature_vectors = [np.histogram(word, bins=bins, density=True)[0] for word in training_quantized_words]
 testing_feature_vectors = [np.histogram(word, bins=bins, density=True)[0] for word in testing_quantized_words]
-print(len(training_feature_vectors))
 
 
 # Encode labels into numerical form:
@@ -295,8 +304,8 @@ classifiers_for_precision_score = train_classifiers(X_train, y_train)
 predictions_for_precision_score = make_predictions(X_test, classifiers_for_precision_score)
 accuracy = accuracy_score(y_test, predictions_for_precision_score)
 precision = precision_score(y_test, predictions_for_precision_score, average='macro', zero_division=0)
-print("Accuracy:", accuracy)
-print("Average Precision:", precision)
+print("\nAccuracy:", accuracy)
+print("Average Precision:", precision, "\n")
 
 
 # Train a new model on the full training dataset:
