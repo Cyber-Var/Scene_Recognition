@@ -17,7 +17,7 @@ dataset_path = os.path.join(script_dir, "..", "training")
 links, labels = load_dataset(dataset_path)
 
 # Preprocess images and create feature vectors
-feature_vectors = [Run3preprocess_image(i).flatten() for i in links]
+feature_vectors = [Run3preprocess_image(i) for i in links]
 
 # Print the shapes of the preprocessed images
 for i, img in enumerate(feature_vectors):
@@ -41,26 +41,43 @@ else:
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=47)
 
 # Hyperparameters
-# based in paper i ve read
-iterations = 15
+# based in
+# Cheng, G., Han, J., & Lu, X. (2017). Remote Sensing Image Scene Classification: Benchmark and State of the Art. In Proceedings of the IEEE (Vol. 105, Issue 10, pp. 1865–1883). Institute of Electrical and Electronics Engineers Inc. https://doi.org/10.1109/JPROC.2017.2675998
+# paper
+iterations = 15000
 batch_size = 128
 learning_rate = 0.001
 last_layer_learning_rate = 0.01
 weight_decay = 0.0005
 momentum = 0.9
 
+# Hyperparameters
+# iterations = 50  # Reduce the number of iterations for faster training
+# batch_size = 128  # Increase the batch size for faster computation
+# learning_rate = 0.01
+# last_layer_learning_rate = 0.1
+# weight_decay = 0.005  # Slightly decrease weight decay
+# momentum = 0.9
+
+# iterations = 50
+# batch_size = 32  # Smaller batch size can help with stability
+# learning_rate = 0.001  # Lower learning rate to prevent overshooting
+# last_layer_learning_rate = 0.001  # Keep the last layer learning rate similar to the base learning rate
+# weight_decay = 1e-5  # Reduce weight decay to avoid excessive regularization
+# momentum = 0.9
+
+
 # AlexNet model with custom learning rates
-def create_alexnet_custom_lr(input_shape=(4096,), num_classes=15):
+def create_alexnet_custom_lr(input_shape=(256, 256, 1), num_classes=15):
     model = models.Sequential()
-    model.add(layers.Reshape((64, 64, 1), input_shape=input_shape))
 
     # Layer 1
     model.add(layers.Conv2D(96, (11, 11), strides=(4, 4), padding='valid', activation='relu'))
-    model.add(layers.MaxPooling2D((2, 2), strides=(1, 1)))
+    model.add(layers.MaxPooling2D((2, 2), strides=(2, 12)))
 
     # Layer 2
     model.add(layers.Conv2D(256, (5, 5), padding='same', activation='relu'))
-    model.add(layers.MaxPooling2D((2, 2), strides=(1, 1)))
+    model.add(layers.MaxPooling2D((2, 2), strides=(2, 2)))
 
     # Layer 3
     model.add(layers.Conv2D(384, (3, 3), padding='same', activation='relu'))
@@ -70,7 +87,7 @@ def create_alexnet_custom_lr(input_shape=(4096,), num_classes=15):
 
     # Layer 5
     model.add(layers.Conv2D(256, (3, 3), padding='same', activation='relu'))
-    model.add(layers.MaxPooling2D((2, 2), strides=(1, 1)))
+    model.add(layers.MaxPooling2D((2, 2), strides=(2, 2)))
 
     # Flatten and fully connected layers
     model.add(layers.Flatten())
@@ -81,8 +98,8 @@ def create_alexnet_custom_lr(input_shape=(4096,), num_classes=15):
     model.add(layers.Dense(num_classes, activation='softmax'))
 
     # Define custom learning rates for different layers
-    optimizer = tf.keras.optimizers.SGD(learning_rate=learning_rate, momentum=momentum, nesterov=True)
-    optimizer_last_layer = tf.keras.optimizers.SGD(learning_rate=last_layer_learning_rate, momentum=momentum, nesterov=True)
+    # optimizer_last_layer = tf.keras.optimizers.legacy.SGD(learning_rate=last_layer_learning_rate, momentum=momentum, nesterov=True)
+    optimizer = tf.keras.optimizers.legacy.SGD(learning_rate=learning_rate, momentum=momentum, nesterov=True)
 
     # Compile the model with custom learning rates
     model.compile(optimizer=optimizer,
@@ -94,19 +111,26 @@ def create_alexnet_custom_lr(input_shape=(4096,), num_classes=15):
 
     return model
 
+# Check if GPU is available
+print("Num GPUs Available: ", len(tf.config.list_physical_devices('GPU')))
+
 # Instantiate the model
-alexnet_custom_lr = create_alexnet_custom_lr().to
+alexnet_custom_lr = create_alexnet_custom_lr()
+
+# Build the model
+alexnet_custom_lr.build((None, 256, 256, 1))  # Specify input shape
 
 # Display the model summary
 alexnet_custom_lr.summary()
 
-# # Callbacks for model checkpointing and early stopping
-# model_checkpoint = ModelCheckpoint(filepath='alexnet_custom_lr_best_model.h5', save_best_only=True)
-# early_stopping = EarlyStopping(patience=10, restore_best_weights=True)
+# Callbacks for model checkpointing and early stopping
+model_checkpoint = ModelCheckpoint(filepath='alexnet_custom_lr_best_model.h5', save_best_only=True)
+early_stopping = EarlyStopping(patience=2000, restore_best_weights=True)
 
 # Train the model
-history = alexnet_custom_lr.fit(X_train, y_train, epochs=iterations, batch_size=batch_size,
-                                validation_data=(X_test, y_test), callbacks=[model_checkpoint, early_stopping])
+with tf.device('/GPU:0'):
+    history = alexnet_custom_lr.fit(X_train, y_train, epochs=iterations, batch_size=batch_size,
+                                    validation_data=(X_test, y_test))
 
 # Evaluate the model on the test data and print accuracy
 test_loss, test_accuracy = alexnet_custom_lr.evaluate(X_test, y_test)
