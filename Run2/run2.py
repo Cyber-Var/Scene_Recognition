@@ -1,15 +1,14 @@
 import os
 import time
-
 import cv2
 from statistics import mode
 import numpy as np
-from sklearn.cluster import KMeans, MiniBatchKMeans
+
+from sklearn.cluster import MiniBatchKMeans
 from sklearn.preprocessing import LabelEncoder
-from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score, precision_score
-import torch
+from sklearn.svm import SVC
 
 
 def read_images(file_path, name):
@@ -55,7 +54,6 @@ def read_images(file_path, name):
         print(f'Error when reading {name} data', e)
 
 
-# TODO: maybe remove this function:
 def check_size_and_scale(data, name):
     """
         Function that prints size and scale information about images
@@ -156,14 +154,7 @@ def learn_vocabulary(data):
     clustering_data = [vector for vector, label in data]
     clustering_data_prepared = [patch for vector in clustering_data for patch in vector]
 
-    # TODO: this can help reduce execution time
-    # Select 10000 random patches to reduce execution time:
-    # indices = np.random.choice(len(clustering_data_prepared), 20000, replace=False)
-    # clustering_data_sampled = np.array(clustering_data_prepared)[indices]
-
-    # TODO: choose between MiniBatchKMeans and the sampled method above !!!
     # Perform the K-Means clustering:
-    # k_means = KMeans(n_clusters=500, n_init=10, random_state=0)
     k_means = MiniBatchKMeans(n_clusters=150, n_init=10, batch_size=1000, random_state=0)
     k_means.fit(clustering_data_prepared)
 
@@ -178,6 +169,7 @@ def vector_quantisation(vectors, vocab):
         :param vocab: vocabulary learnt from training set's images
         :return list of visual words
     """
+
     words = []
 
     for vector in vectors:
@@ -203,12 +195,12 @@ def train_classifiers(input_features, targets):
         # Set only the current class as the positive class:
         class_targets = [1 if target == i else 0 for target in targets]
 
-        # Create and train the Logistic Regression model:
-        logistic_reg = LogisticRegression(max_iter=1000, random_state=42)
-        logistic_reg.fit(input_features, class_targets)
+        # Create and train the Support Vector Machines model:
+        svm = SVC(kernel='linear', probability=True, random_state=42)
+        svm.fit(input_features, class_targets)
 
         # Add the trained model to the list of classifiers:
-        classifiers_for_each_label.append(logistic_reg)
+        classifiers_for_each_label.append(svm)
 
     return classifiers_for_each_label
 
@@ -258,8 +250,8 @@ check_size_and_scale([image for image, filename in testing_data], "Testing")
 
 
 # Split the images into 5 by 5 patches, sampled every 5 pixels in the x and y directions:
-training_patches = [(split_image_into_patches(image, 5, 5), label) for image, label in training_data]
-testing_patches = [split_image_into_patches(image, 5, 5) for image, filename in testing_data]
+training_patches = [(split_image_into_patches(image, 7, 4), label) for image, label in training_data]
+testing_patches = [split_image_into_patches(image, 7, 4) for image, filename in testing_data]
 
 # Mean-center and normalize patches:
 training_mean_centered_normalized = [(normalize_and_mean_center_patches(patches), label) for patches, label in training_patches]
@@ -271,19 +263,11 @@ testing_vectors = [flatten_patches_into_vector(patches) for patches in testing_m
 
 
 # Apply K-Means clustering on training data to learn the visual vocabulary:
-start = time.time()
 vocabulary = learn_vocabulary(training_vectors)
-end = time.time()
-print(f"Clustering took {end - start} seconds.")
-
 
 # Map each feature vector to the closest visual word using vocabulary learnt from training data:
-start = time.time()
 training_quantized_words = [vector_quantisation(vector, vocabulary) for vector, label in training_vectors]
 testing_quantized_words = [vector_quantisation(vector, vocabulary) for vector in testing_vectors]
-end = time.time()
-print(f"Quantization took {end - start} seconds.")
-
 
 # Draw a histogram over the visual word counts for each image:
 bins = np.arange(len(vocabulary+1))
@@ -304,20 +288,13 @@ classifiers_for_precision_score = train_classifiers(X_train, y_train)
 predictions_for_precision_score = make_predictions(X_test, classifiers_for_precision_score)
 accuracy = accuracy_score(y_test, predictions_for_precision_score)
 precision = precision_score(y_test, predictions_for_precision_score, average='macro', zero_division=0)
-print("\nAccuracy:", accuracy)
-print("Average Precision:", precision, "\n")
+print("Accuracy:", accuracy)
+print("Average Precision:", precision)
 
 
 # Train a new model on the full training dataset:
-start = time.time()
 one_vs_all_classifiers = train_classifiers(training_feature_vectors, labels_encoded)
-end = time.time()
-print(f"Training classifiers took {end - start} seconds.")
 
 # Make classification predictions on the testing set and write the results to run2.txt:
 final_predictions = make_predictions(testing_feature_vectors, one_vs_all_classifiers)
 write_predictions_to_file(final_predictions, testing_filenames, encoder)
-
-
-os.system('say "your program has finished"')
-
