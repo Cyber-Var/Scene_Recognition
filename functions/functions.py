@@ -14,7 +14,7 @@ def resize_img(image):
     return resized_img
 
 def run3Resize_img(image):
-    resized_img = image.resize((256, 256))
+    resized_img = image.resize((224, 224))
     return resized_img
 
 def preprocess_image(image_path):

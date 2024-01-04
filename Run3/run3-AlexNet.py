@@ -10,6 +10,12 @@ import tensorflow as tf
 from tensorflow.keras.callbacks import ModelCheckpoint, EarlyStopping
 
 from functions.functions import *
+import os
+import numpy as np
+
+import tensorflow as tf
+from tensorflow.keras import layers, models
+from sklearn.preprocessing import LabelEncoder
 
 script_dir = os.path.dirname(os.path.realpath(__file__))
 
@@ -68,7 +74,7 @@ momentum = 0.9
 
 
 # AlexNet model with custom learning rates
-def create_alexnet_custom_lr(input_shape=(256, 256, 1), num_classes=15):
+def create_alexnet_custom_lr(num_classes=15):
     model = models.Sequential()
 
     # Layer 1
@@ -118,7 +124,7 @@ print("Num GPUs Available: ", len(tf.config.list_physical_devices('GPU')))
 alexnet_custom_lr = create_alexnet_custom_lr()
 
 # Build the model
-alexnet_custom_lr.build((None, 256, 256, 1))  # Specify input shape
+alexnet_custom_lr.build((None, 224, 224, 1))  # Specify input shape
 
 # Display the model summary
 alexnet_custom_lr.summary()
