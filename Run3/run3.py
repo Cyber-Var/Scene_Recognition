@@ -47,21 +47,17 @@ y = np.array(y, dtype=np.int32)
 
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=47)
 
-
-
-def create_alexnet(input_shape=(1024,), num_classes=10):
+def create_alexnet(input_shape=(1024,), num_classes=15):
     model = models.Sequential()
-
-    # Reshape the flattened input to match the size of your preprocessed images
     model.add(layers.Reshape((32, 32, 1), input_shape=input_shape))
 
     # Layer 1
     model.add(layers.Conv2D(96, (11, 11), strides=(4, 4), padding='valid', activation='relu'))
-    model.add(layers.MaxPooling2D((2, 2), strides=(2, 2)))
+    model.add(layers.MaxPooling2D((2, 2), strides=(1, 1)))
 
     # Layer 2
     model.add(layers.Conv2D(256, (5, 5), padding='same', activation='relu'))
-    model.add(layers.MaxPooling2D((2, 2), strides=(2, 2)))
+    model.add(layers.MaxPooling2D((2, 2), strides=(1, 1)))
 
     # Layer 3
     model.add(layers.Conv2D(384, (3, 3), padding='same', activation='relu'))
@@ -71,7 +67,7 @@ def create_alexnet(input_shape=(1024,), num_classes=10):
 
     # Layer 5
     model.add(layers.Conv2D(256, (3, 3), padding='same', activation='relu'))
-    model.add(layers.MaxPooling2D((2, 2), strides=(2, 2)))
+    model.add(layers.MaxPooling2D((2, 2), strides=(1, 1)))
 
     # Flatten and fully connected layers
     model.add(layers.Flatten())
