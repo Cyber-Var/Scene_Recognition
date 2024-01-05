@@ -1,5 +1,14 @@
 from sklearn.neighbors import KNeighborsClassifier
-from functions import *
+import os 
+import sys
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import accuracy_score
+
+rootpath = os.path.join(os.getcwd(), '..')
+sys.path.append(rootpath)
+
+
+from functions.functions import *
 
 
 
@@ -13,8 +22,8 @@ feature_vectors = []
 for i in links:
     feature_vectors.append(preprocess_image(i).flatten())
 
-X = np.array(feature_vectors)
-y = np.array(labels).reshape(-1)
+X = feature_vectors
+y = labels
 
 
 knn_classifier = KNeighborsClassifier(n_neighbors=11)
@@ -57,7 +66,7 @@ with open("run1.txt", 'w') as output_file:
 
 
 
-#TESTING ON TRAIN DATA
+# # TESTING ON TRAIN DATA
 
 
 # # Split the data into training and testing sets
