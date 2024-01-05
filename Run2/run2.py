@@ -284,12 +284,10 @@ labels_encoded = encoder.fit_transform(labels)
 # Split the training dataset (80% for training and 20% for testing) to evaluate the model's performance:
 X_train, X_test, y_train, y_test = train_test_split(training_feature_vectors, labels_encoded, test_size=0.2,
                                                     random_state=42, stratify=labels_encoded)
-classifiers_for_precision_score = train_classifiers(X_train, y_train)
-predictions_for_precision_score = make_predictions(X_test, classifiers_for_precision_score)
-accuracy = accuracy_score(y_test, predictions_for_precision_score)
-precision = precision_score(y_test, predictions_for_precision_score, average='macro', zero_division=0)
-print("Accuracy:", accuracy)
-print("Average Precision:", precision)
+classifiers_for_evaluation = train_classifiers(X_train, y_train)
+predictions_for_evaluation = make_predictions(X_test, classifiers_for_evaluation)
+accuracy = accuracy_score(y_test, predictions_for_evaluation)
+print("Average Precision:", accuracy)
 
 
 # Train a new model on the full training dataset:
