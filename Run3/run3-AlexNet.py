@@ -4,7 +4,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
 from sklearn.metrics import average_precision_score
 import matplotlib.pyplot as plt
-from tensorflow.keras import layers, models, optimizers
+from tensorflow.keras import models, layers, optimizers, regularizers
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
 import tensorflow as tf
 from tensorflow.keras.callbacks import ModelCheckpoint, EarlyStopping
@@ -74,46 +74,105 @@ momentum = 0.9
 
 
 # AlexNet model with custom learning rates
-def create_alexnet_custom_lr(num_classes=15):
+# def create_alexnet_custom_lr(num_classes=15):
+#     model = models.Sequential()
+#
+#     # Layer 1
+#     model.add(layers.Conv2D(96, (11, 11), strides=(4, 4), padding='valid', activation='relu'))
+#     model.add(layers.MaxPooling2D((2, 2), strides=(2, 12)))
+#
+#     # Layer 2
+#     model.add(layers.Conv2D(256, (5, 5), padding='same', activation='relu'))
+#     model.add(layers.MaxPooling2D((2, 2), strides=(2, 2)))
+#
+#     # Layer 3
+#     model.add(layers.Conv2D(384, (3, 3), padding='same', activation='relu'))
+#
+#     # Layer 4
+#     model.add(layers.Conv2D(384, (3, 3), padding='same', activation='relu'))
+#
+#     # Layer 5
+#     model.add(layers.Conv2D(256, (3, 3), padding='same', activation='relu'))
+#     model.add(layers.MaxPooling2D((2, 2), strides=(2, 2)))
+#
+#     # Flatten and fully connected layers
+#     model.add(layers.Flatten())
+#     model.add(layers.Dense(4096, activation='relu', kernel_regularizer=tf.keras.regularizers.l2(weight_decay)))
+#     model.add(layers.Dropout(0.5))
+#     model.add(layers.Dense(4096, activation='relu', kernel_regularizer=tf.keras.regularizers.l2(weight_decay)))
+#     model.add(layers.Dropout(0.5))
+#     model.add(layers.Dense(num_classes, activation='softmax'))
+#
+#     # Define custom learning rates for different layers
+#     # optimizer_last_layer = tf.keras.optimizers.legacy.SGD(learning_rate=last_layer_learning_rate, momentum=momentum, nesterov=True)
+#     optimizer = tf.keras.optimizers.legacy.SGD(learning_rate=learning_rate, momentum=momentum, nesterov=True)
+#
+#     # Compile the model with custom learning rates
+#     model.compile(optimizer=optimizer,
+#                   loss='sparse_categorical_crossentropy',  # Use 'categorical_crossentropy' if your labels are one-hot encoded
+#                   metrics=['accuracy'])
+#
+#     # Set the last layer's learning rate
+#     model.layers[-1].set_weights([last_layer_learning_rate * w for w in model.layers[-1].get_weights()])
+#
+#     return model
+
+def create_alexnet_custom_lr(input_shape=(224, 224, 1), num_classes=15, learning_rate=0.001, momentum=0.9, weight_decay=0.0005):
     model = models.Sequential()
 
     # Layer 1
-    model.add(layers.Conv2D(96, (11, 11), strides=(4, 4), padding='valid', activation='relu'))
-    model.add(layers.MaxPooling2D((2, 2), strides=(2, 12)))
+    model.add(layers.Conv2D(96, (11, 11), strides=(4, 4), padding='valid', activation='relu', input_shape=input_shape,
+                            kernel_regularizer=regularizers.l2(weight_decay)))
+    model.add(layers.MaxPooling2D((3, 3), strides=(2, 2), padding='valid'))
+    model.add(layers.BatchNormalization())
 
     # Layer 2
-    model.add(layers.Conv2D(256, (5, 5), padding='same', activation='relu'))
-    model.add(layers.MaxPooling2D((2, 2), strides=(2, 2)))
+    model.add(layers.Conv2D(256, (5, 5), padding='same', activation='relu',
+                            kernel_regularizer=regularizers.l2(weight_decay)))
+    model.add(layers.MaxPooling2D((3, 3), strides=(2, 2), padding='valid'))
+    model.add(layers.BatchNormalization())
 
     # Layer 3
-    model.add(layers.Conv2D(384, (3, 3), padding='same', activation='relu'))
+    model.add(layers.Conv2D(384, (3, 3), padding='same', activation='relu',
+                            kernel_regularizer=regularizers.l2(weight_decay)))
+    model.add(layers.BatchNormalization())
 
     # Layer 4
-    model.add(layers.Conv2D(384, (3, 3), padding='same', activation='relu'))
+    model.add(layers.Conv2D(384, (3, 3), padding='same', activation='relu',
+                            kernel_regularizer=regularizers.l2(weight_decay)))
+    model.add(layers.BatchNormalization())
 
     # Layer 5
-    model.add(layers.Conv2D(256, (3, 3), padding='same', activation='relu'))
-    model.add(layers.MaxPooling2D((2, 2), strides=(2, 2)))
+    model.add(layers.Conv2D(256, (3, 3), padding='same', activation='relu',
+                            kernel_regularizer=regularizers.l2(weight_decay)))
+    model.add(layers.MaxPooling2D((3, 3), strides=(2, 2), padding='valid'))
+    model.add(layers.BatchNormalization())
 
-    # Flatten and fully connected layers
-    model.add(layers.Flatten())
-    model.add(layers.Dense(4096, activation='relu', kernel_regularizer=tf.keras.regularizers.l2(weight_decay)))
+    # Global Average Pooling
+    model.add(layers.GlobalAveragePooling2D())
+
+    # Fully Connected Layers
+    model.add(layers.Dense(4096, activation='relu', kernel_regularizer=regularizers.l2(weight_decay)))
+    model.add(layers.BatchNormalization())
     model.add(layers.Dropout(0.5))
-    model.add(layers.Dense(4096, activation='relu', kernel_regularizer=tf.keras.regularizers.l2(weight_decay)))
+
+    model.add(layers.Dense(4096, activation='relu', kernel_regularizer=regularizers.l2(weight_decay)))
+    model.add(layers.BatchNormalization())
     model.add(layers.Dropout(0.5))
+
+    # Additional Dense Layer
+    model.add(layers.Dense(1024, activation='relu', kernel_regularizer=regularizers.l2(weight_decay)))
+    model.add(layers.BatchNormalization())
+    model.add(layers.Dropout(0.5))
+
+    # Output Layer
     model.add(layers.Dense(num_classes, activation='softmax'))
 
-    # Define custom learning rates for different layers
-    # optimizer_last_layer = tf.keras.optimizers.legacy.SGD(learning_rate=last_layer_learning_rate, momentum=momentum, nesterov=True)
-    optimizer = tf.keras.optimizers.legacy.SGD(learning_rate=learning_rate, momentum=momentum, nesterov=True)
-
-    # Compile the model with custom learning rates
-    model.compile(optimizer=optimizer,
-                  loss='sparse_categorical_crossentropy',  # Use 'categorical_crossentropy' if your labels are one-hot encoded
+    # Optimizer and Learning Rate Scheduler
+    custom_optimizer = optimizers.Adam(learning_rate=learning_rate)
+    model.compile(optimizer=custom_optimizer,
+                  loss='sparse_categorical_crossentropy',
                   metrics=['accuracy'])
-
-    # Set the last layer's learning rate
-    model.layers[-1].set_weights([last_layer_learning_rate * w for w in model.layers[-1].get_weights()])
 
     return model
 
