@@ -1,100 +1,117 @@
-from PIL import Image
-import numpy as np
-from sklearn.model_selection import train_test_split
+import cv2
+import os 
 from sklearn.neighbors import KNeighborsClassifier
-from sklearn.metrics import accuracy_score
-import os
 import sys
-rootpath = os.path.join(os.getcwd(), '..')
-sys.path.append(rootpath)
-
-from functions.functions import *
-import os
-import numpy as np
-import tensorflow as tf
-from tensorflow.keras import layers, models
-from tensorflow.keras.preprocessing.image import ImageDataGenerator
-
-import tensorflow as tf
-from tensorflow.keras import layers, models
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import accuracy_score
+from sklearn.model_selection import cross_val_score
 from sklearn.preprocessing import LabelEncoder
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.svm import SVC
+import numpy as np
+
+
+
+def load_dataset(root_folder):
+    image_paths = []
+    labels = []
+
+    for class_label, class_name in enumerate(os.listdir(root_folder)):
+        class_folder = os.path.join(root_folder, class_name)
+        
+        if os.path.isdir(class_folder):
+            for filename in os.listdir(class_folder):
+                if filename.endswith(".jpg"):
+                    image_path = os.path.join(class_folder, filename)
+                    image_path = os.path.normpath(image_path)
+
+                    image_paths.append(image_path)
+                    labels.append(class_name)
+
+    return image_paths,labels
+
 
 
 script_dir = os.path.dirname(os.path.realpath(__file__))
-
 dataset_path = os.path.join(script_dir, "..", "training")
 links, labels = load_dataset(dataset_path)
 
-feature_vectors = []
 
-
-# Preprocess images and create feature vectors
-feature_vectors = [Run3preprocess_image(i).flatten() for i in links[:500]]
-# X = feature_vectors
-
-# Print the shapes of the preprocessed images
-for i, img in enumerate(feature_vectors):
-    print(f"Shape of preprocessed image {i + 1}: {img.shape}")
-
-# # Use label encoding to convert string labels to numerical format
+# Convert string labels to integer format
 label_encoder = LabelEncoder()
-y = label_encoder.fit_transform(labels[:500])
+numerical_labels = label_encoder.fit_transform(labels)
 
 
-# Convert to NumPy array
-X = np.array(feature_vectors)
-y = np.array(y, dtype=np.int32)
+def create_dense_sift(image_path, target_size, step_size):
+    # Read the grayscale image
+    gray_image = cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
 
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=47)
+    # Resize the image to the target size
+    gray_image_resized = cv2.resize(gray_image, target_size[::-1])  # Reverse target_size for (width, height)
 
-def create_alexnet(input_shape=(1024,), num_classes=15):
-    model = models.Sequential()
-    model.add(layers.Reshape((32, 32, 1), input_shape=input_shape))
+    # Create dense grid of keypoints
+    keypoints = [cv2.KeyPoint(x, y, step_size) for y in range(0, gray_image_resized.shape[0], step_size) for x in range(0, gray_image_resized.shape[1], step_size)]
 
-    # Layer 1
-    model.add(layers.Conv2D(96, (11, 11), strides=(4, 4), padding='valid', activation='relu'))
-    model.add(layers.MaxPooling2D((2, 2), strides=(1, 1)))
+    # Create a SIFT object
+    sift = cv2.SIFT_create()
 
-    # Layer 2
-    model.add(layers.Conv2D(256, (5, 5), padding='same', activation='relu'))
-    model.add(layers.MaxPooling2D((2, 2), strides=(1, 1)))
+    # Compute SIFT descriptors for the dense keypoints
+    keypoints, descriptors = sift.compute(gray_image_resized, keypoints)
 
-    # Layer 3
-    model.add(layers.Conv2D(384, (3, 3), padding='same', activation='relu'))
+    # Reshape the descriptors to form the dense SIFT image
+    sift_image = descriptors.reshape((descriptors.shape[0], -1, 128))
 
-    # Layer 4
-    model.add(layers.Conv2D(384, (3, 3), padding='same', activation='relu'))
-
-    # Layer 5
-    model.add(layers.Conv2D(256, (3, 3), padding='same', activation='relu'))
-    model.add(layers.MaxPooling2D((2, 2), strides=(1, 1)))
-
-    # Flatten and fully connected layers
-    model.add(layers.Flatten())
-    model.add(layers.Dense(4096, activation='relu'))
-    model.add(layers.Dropout(0.5))
-    model.add(layers.Dense(4096, activation='relu'))
-    model.add(layers.Dropout(0.5))
-    model.add(layers.Dense(num_classes, activation='softmax'))
-
-    return model
+    return sift_image
 
 
-# Instantiate the model
-alexnet = create_alexnet()
+def create_sift_image(image_path, target_size):
+    # Read the image turn grayscale if its not
+    gray_image = cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
 
-# Display the model summary
-alexnet.summary()
+    # Resize the image to the target size 
+    gray_image_resized = cv2.resize(gray_image, target_size[::-1])  # Reverse target_size for (width, height)
 
-# Compile the model
-alexnet.compile(optimizer='adam',
-                loss='sparse_categorical_crossentropy',  # Use 'categorical_crossentropy' if your labels are one-hot encoded
-                metrics=['accuracy'])
+    # Create the SIFT object
+    sift = cv2.SIFT_create()
+
+    # Detect keypoints and compute SIFT descriptors
+    keypoints, descriptors = sift.detectAndCompute(gray_image_resized, None)
+
+    # Draw keypoints on the image
+    sift_image = cv2.drawKeypoints(gray_image_resized, keypoints, None)
+
+    return sift_image
 
 
 
-alexnet.fit(X_train, y_train, epochs=10, validation_data=(X_test, y_test))
 
-# Evaluate the model on the test data and print accuracy
-test_loss, test_accuracy = alexnet.evaluate(X_test, y_test)
-print(f'\nTest Accuracy: {test_accuracy * 100:.2f}%')
+#Testing Random Forests, KNN, Bayes, SVC, CNN we go the highest accuracy with SVC using the poly kernel with 8 degrees. 
+# Using 24 pixels as the dense parameter also gave us the highest accuracy when doing cross validation
+# Dense Sift gave us way better results than normal sift, therefore we will be using dense sift to pre process the images. 
+
+
+sift_images = []
+
+# Pre Processing each image with dense sift
+for i in links:
+    sift_img = create_dense_sift(i, (224, 224), 24)
+    sift_images.append(sift_img)
+
+
+# Flatten the dense SIFT images
+flattened_sift_images = [sift_img.flatten() for sift_img in sift_images]
+
+# data splitting
+X_train, X_test, y_train, y_test = train_test_split(flattened_sift_images, numerical_labels, test_size=0.2, random_state=42)
+
+svm_classifier = SVC(kernel='poly',decision_function_shape='ovr', degree=8)
+
+# train
+svm_classifier.fit(X_train, y_train)
+
+# Predict the test 
+y_pred = svm_classifier.predict(X_test)
+
+# acuracy
+accuracy = accuracy_score(y_test, y_pred)
+print("Accuracy:", accuracy)
