@@ -224,8 +224,8 @@ checkpoint_path = 'alexnet_best_model.h5'
 model_checkpoint = ModelCheckpoint(
     filepath=checkpoint_path,
     save_best_only=True,
-    monitor='val_loss',  # Monitor the validation loss
-    mode='min',  # Save when the monitored quantity is minimized
+    monitor='val_accuracy',  # Monitor the validation loss
+    mode='max',  # Save when the monitored quantity is minimized
     verbose=1  # Display informative messages
 )
 
@@ -325,3 +325,19 @@ best_model = models.load_model(checkpoint_path)
 # Evaluate the best model on the test data
 test_loss, test_accuracy = best_model.evaluate(X_test, y_test)
 print(f'\nBest Model Test Accuracy: {test_accuracy * 100:.2f}%')
+
+# Predict the labels for the new testing set
+new_y_pred = best_model.predict(preprocess_input(testing_set))
+predicted_labels = np.argmax(new_y_pred, axis=1)
+
+# Create a dictionary to map numerical labels to lowercase label names
+label_mapping = {label_idx: label.lower() for label_idx, label in enumerate(label_encoder.classes_)}
+
+# Write predictions to the "run3.txt" file
+with open("run3.txt", "w") as file:
+    for img_path, predicted_label_idx in zip(testing_image_paths, predicted_labels):
+        predicted_label = label_mapping[predicted_label_idx]
+        file.write(f"{os.path.basename(img_path)} {predicted_label}\n")
+
+# Print a message indicating that the predictions have been saved to the file
+print("Predictions saved to run3.txt file.")

@@ -277,15 +277,19 @@ print(f'\nTest Accuracy: {test_accuracy * 100:.2f}%')
 
 # PREDICT THE TESTING SET
 
-# Predict the labels for the new testing set
-new_y_pred = best_model.predict(preprocess_input(testing_set))
-predicted_labels = np.argmax(new_y_pred, axis=1)
+# # Predict the labels for the new testing set
+# new_y_pred = best_model.predict(preprocess_input(testing_set))
+# predicted_labels = np.argmax(new_y_pred, axis=1)
+#
+# # Create a dictionary to map numerical labels to lowercase label names
+# label_mapping = {label_idx: label.lower() for label_idx, label in enumerate(label_encoder.classes_)}
+#
+# # Write predictions to the "run3.txt" file
+# with open("run3.txt", "w") as file:
+#     for img_path, predicted_label_idx in zip(testing_image_paths, predicted_labels):
+#         predicted_label = label_mapping[predicted_label_idx]
+#         file.write(f"{os.path.basename(img_path)} {predicted_label}\n")
+#
+# # Print a message indicating that the predictions have been saved to the file
+# print("Predictions saved to run3.txt file.")
 
-# Write predictions to the "run3.txt" file
-with open("run3.txt", "w") as file:
-    for img_path, predicted_label_idx in zip(testing_image_paths, predicted_labels):
-        predicted_label = label_encoder.classes_[predicted_label_idx]
-        file.write(f"{os.path.basename(img_path)} {predicted_label}\n")
-
-# Print a message indicating that the predictions have been saved to the file
-print("Predictions saved to run3.txt file.")

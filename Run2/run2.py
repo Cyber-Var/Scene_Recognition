@@ -293,6 +293,7 @@ print("Average Precision:", accuracy)
 # Train a new model on the full training dataset:
 one_vs_all_classifiers = train_classifiers(training_feature_vectors, labels_encoded)
 
+# TODO - put in order all the predictions
 # Make classification predictions on the testing set and write the results to run2.txt:
 final_predictions = make_predictions(testing_feature_vectors, one_vs_all_classifiers)
 write_predictions_to_file(final_predictions, testing_filenames, encoder)

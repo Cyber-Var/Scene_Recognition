@@ -246,12 +246,36 @@ def dense_net_201(input_shape=(224, 224, 3), num_classes=15):
     return model
 
 
-# Check if GPU is available
-if tf.test.gpu_device_name():
-    print('GPU available:', tf.test.gpu_device_name())
-    print("Num GPUs Available: ", len(tf.config.list_physical_devices('GPU')))
-else:
-    print("No GPU detected. Switching to CPU.")
+# # Check if GPU is available
+# if tf.test.gpu_device_name():
+#     print('GPU available:', tf.test.gpu_device_name())
+#     print("Num GPUs Available: ", len(tf.config.list_physical_devices('GPU')))
+# else:
+#     print("No GPU detected. Switching to CPU.")
+#
+# # Train the model on GPU
+# with tf.device('/GPU:0'):
+#     # Build the model
+#     densenet_model = dense_net_201()
+#
+#     # Display the model summary
+#     densenet_model.summary()
+#
+#     # Train the model on GPU
+#     fitted_model = densenet_model.fit(preprocess_input(X_train), y_train, epochs=epochs, batch_size=batch_size,
+#                                       validation_data=(preprocess_input(X_test), y_test),
+#                                       callbacks=[model_checkpoint])
+#
+# # Load the best model
+# best_model = models.load_model(checkpoint_path)
+#
+# # MODEL EVALUATION
+#
+# # Evaluate the model on the test data and print accuracy
+# test_loss, test_accuracy = best_model.evaluate(preprocess_input(X_test), y_test)
+# print(f'\nTest Accuracy: {test_accuracy * 100:.2f}%')
+
+# TRAIN THE MODEL WITH FULL DATA
 
 # Train the model on GPU
 with tf.device('/GPU:0'):
@@ -262,35 +286,11 @@ with tf.device('/GPU:0'):
     densenet_model.summary()
 
     # Train the model on GPU
-    fitted_model = densenet_model.fit(preprocess_input(X_train), y_train, epochs=epochs, batch_size=batch_size,
-                                      validation_data=(preprocess_input(X_test), y_test),
+    fitted_model = densenet_model.fit(preprocess_input(X), y, epochs=epochs, batch_size=batch_size,
                                       callbacks=[model_checkpoint])
 
 # Load the best model
 best_model = models.load_model(checkpoint_path)
-
-# MODEL EVALUATION
-
-# Evaluate the model on the test data and print accuracy
-test_loss, test_accuracy = best_model.evaluate(preprocess_input(X_test), y_test)
-print(f'\nTest Accuracy: {test_accuracy * 100:.2f}%')
-
-# TRAIN THE MODEL WITH FULL DATA
-
-# # Train the model on GPU
-# with tf.device('/GPU:0'):
-#     # Build the model
-#     densenet_model = dense_net_201()
-#
-#     # Display the model summary
-#     densenet_model.summary()
-#
-#     # Train the model on GPU
-#     fitted_model = densenet_model.fit(preprocess_input(X), y, epochs=epochs, batch_size=batch_size,
-#                                       callbacks=[model_checkpoint])
-#
-# # Load the best model
-# best_model = models.load_model(checkpoint_path)
 
 # PREDICT THE TESTING SET
 
@@ -298,10 +298,13 @@ print(f'\nTest Accuracy: {test_accuracy * 100:.2f}%')
 new_y_pred = best_model.predict(preprocess_input(testing_set))
 predicted_labels = np.argmax(new_y_pred, axis=1)
 
+# Create a dictionary to map numerical labels to lowercase label names
+label_mapping = {label_idx: label.lower() for label_idx, label in enumerate(label_encoder.classes_)}
+
 # Write predictions to the "run3.txt" file
 with open("run3.txt", "w") as file:
     for img_path, predicted_label_idx in zip(testing_image_paths, predicted_labels):
-        predicted_label = label_encoder.classes_[predicted_label_idx]
+        predicted_label = label_mapping[predicted_label_idx]
         file.write(f"{os.path.basename(img_path)} {predicted_label}\n")
 
 # Print a message indicating that the predictions have been saved to the file
