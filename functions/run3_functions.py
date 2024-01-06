@@ -70,7 +70,7 @@ def process_image_densenet_3d(image_path, average_height, average_width):
 def zero_mean_normalize(image):
     mean_value = np.mean(image)
     std_value = np.std(image)
-    normalized_image = (image - mean_value) /std_value
+    normalized_image = (image - mean_value) / std_value
     return normalized_image
 
 
@@ -80,3 +80,15 @@ def process_image_alexnet(image_path, average_height, average_width):
         image_np_array = np.array(resized_image)
         nor_img = zero_mean_normalize(image_np_array)
         return nor_img
+
+
+def load_testing_dataset(testing_folder):
+    image_paths = []
+
+    for filename in os.listdir(testing_folder):
+        if filename.endswith(".jpg"):
+            image_path = os.path.join(testing_folder, filename)
+            image_path = os.path.normpath(image_path)
+            image_paths.append(image_path)
+
+    return image_paths
