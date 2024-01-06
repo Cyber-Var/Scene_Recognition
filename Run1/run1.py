@@ -8,7 +8,7 @@ from sklearn.model_selection import cross_val_score
 rootpath = os.path.join(os.getcwd(), '..')
 sys.path.append(rootpath)
 
-from functions.functions import *
+from functions.run1_functions import *
 
 
 
