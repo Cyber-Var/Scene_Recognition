@@ -4,74 +4,11 @@ import sys
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score
 from sklearn.model_selection import cross_val_score
+from PIL import Image
+import numpy as np
 
 rootpath = os.path.join(os.getcwd(), '..')
 sys.path.append(rootpath)
-
-from functions.run1_functions import *
-
-
-#Get our directory
-script_dir = os.path.dirname(os.path.realpath(__file__))
-
-#Get the training directory were our training dataset is
-dataset_path = os.path.join(script_dir, "..", "training")
-#Links of the images and the labels of each image
-links, labels = load_dataset(dataset_path)
-
-#All the image's features added to this array.
-feature_vectors = []
-
-#Preprcoess the each image 
-#Preprocessing includes resizing and normalisation
-for i in links:
-    feature_vectors.append(preprocess_image(i).flatten())
-
-#feature vectors of the training images
-X = feature_vectors
-#Labels of the imahges
-y = labels
-
-#Create a K neighbors classifier using the best n parameter which was tested and found to be 7. 
-knn_classifier = KNeighborsClassifier(n_neighbors=7)
-#Fit the training and its labels into the model
-knn_classifier.fit(X, y)
-
-
-#Outputing Test Data Predictions
-
-#The directory where the testing images are
-test_dir = os.path.join(script_dir, "..", "testing")
-
-#Test image name
-test_file_names = []
-#Predicted class for each image
-test_class = []
-
-#Go through each test image pre-process them then classify it as one of the classifiers.
-#Append the name of the image being classified to the text_files_names
-#Append the classification of the image to the test_class
-for i in range(0,2988):
-    try:
-        file_path_temp = os.path.join(test_dir, f"{i}.jpg")
-
-        preprocessed_image = preprocess_image(file_path_temp).flatten()
-
-        preprocessed_image = preprocessed_image.reshape(1, -1)
-
-        predicted_class = knn_classifier.predict(preprocessed_image)
-
-        test_class.append(predicted_class)
-        test_file_names.append(str(i) + ".jpg")
-    except Exception as e:
-        print(f"Error processing image {file_path_temp}: {e}")
-
-
-#Create the run1.txt file and write all the test classification 
-with open("run1.txt", 'w') as output_file:
-    for m in range(0, len(test_class)):
-        output_file.write(str(test_file_names[m]) + " " + str(test_class[m][0]) + "\n")
-
 
 def zero_mean_normalize(image):
     """
@@ -130,4 +67,71 @@ def load_dataset(root_folder):
                     labels.append(class_name)
 
     return image_paths,labels
+
+
+
+
+#Get our directory
+script_dir = os.path.dirname(os.path.realpath(__file__))
+
+#Get the training directory were our training dataset is
+dataset_path = os.path.join(script_dir, "..", "training")
+#Links of the images and the labels of each image
+links, labels = load_dataset(dataset_path)
+
+#All the image's features added to this array.
+feature_vectors = []
+
+#Preprcoess the each image 
+#Preprocessing includes resizing and normalisation
+for i in links:
+    feature_vectors.append(preprocess_image(i).flatten())
+
+#feature vectors of the training images
+X = feature_vectors
+#Labels of the imahges
+y = labels
+
+#Create a K neighbors classifier using the best n parameter which was tested and found to be 7. 
+knn_classifier = KNeighborsClassifier(n_neighbors=7)
+#Fit the training and its labels into the model
+knn_classifier.fit(X, y)
+
+
+#Outputing Test Data Predictions
+
+#The directory where the testing images are
+test_dir = os.path.join(script_dir, "..", "testing")
+
+#Test image name
+test_file_names = []
+#Predicted class for each image
+test_class = []
+
+#Go through each test image pre-process them then classify it as one of the classifiers.
+#Append the name of the image being classified to the text_files_names
+#Append the classification of the image to the test_class
+for i in range(0,2988):
+    try:
+        file_path_temp = os.path.join(test_dir, f"{i}.jpg")
+
+        preprocessed_image = preprocess_image(file_path_temp).flatten()
+
+        preprocessed_image = preprocessed_image.reshape(1, -1)
+
+        predicted_class = knn_classifier.predict(preprocessed_image)
+
+        predicted_class = str(predicted_class[0].lower())  # Convert numpy array to string    
+
+        test_class.append(predicted_class)
+        test_file_names.append(str(i) + ".jpg")
+    except Exception as e:
+        print(f"Error processing image {file_path_temp}: {e}")
+
+
+#Create the run1.txt file and write all the test classification 
+with open("run1.txt", 'w') as output_file:
+    for m in range(0, len(test_class)):
+        output_file.write(str(test_file_names[m]) + " " + str(test_class[m]) + "\n")
+
 
