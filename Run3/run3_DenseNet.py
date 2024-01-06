@@ -1,5 +1,5 @@
 from sklearn.model_selection import train_test_split
-from sklearn.metrics import average_precision_score
+from sklearn.metrics import average_precision_score, accuracy_score
 from sklearn.preprocessing import LabelEncoder
 
 import tensorflow as tf
@@ -116,29 +116,8 @@ with tf.device('/GPU:0'):
 # Load the best model
 best_model = models.load_model(checkpoint_path)
 
-# MODEL PREDICTIONS
-
-# Predict probabilities on the test set using the features
-y_predicted = densenet_model.predict(preprocess_input(X_test))
-
 # MODEL EVALUATION
 
-# Evaluate the model on the test data and print accuracy
+# # Evaluate the model on the test data and print accuracy
 test_loss, test_accuracy = best_model.evaluate(preprocess_input(X_test), y_test)
 print(f'\nTest Accuracy: {test_accuracy * 100:.2f}%')
-
-# Calculate Average Precision for each class
-average_precisions = []
-for class_index in range(15):
-    true_labels_class = (y_test == class_index).astype(int)
-    predicted_scores_class = y_predicted[:, class_index]
-
-    # Compute average precision for the current class
-    average_precision = average_precision_score(true_labels_class, predicted_scores_class)
-    average_precisions.append(average_precision)
-
-    print(f'Average Precision for class {class_index}: {average_precision:.4f}')
-
-# Calculate and print the mean Average Precision (mAP)
-mean_average_precision = np.mean(average_precisions)
-print(f'Mean Average Precision (mAP): {mean_average_precision:.4f}')

@@ -44,7 +44,7 @@ X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_
 # MODEL TRAINING
 
 # Hyperparameters based on paper
-iterations = 100
+epochs = 100
 batch_size = 32
 learning_rate = 0.0001
 last_layer_learning_rate = 0.001
@@ -146,7 +146,7 @@ with tf.device('/GPU:0'):
 
     # Fit the model with the ModelCheckpoint callback
     fitted_model = create_alexnet_custom_lr.fit(
-        X_train, y_train, epochs=iterations, batch_size=batch_size,
+        X_train, y_train, epochs=epochs, batch_size=batch_size,
         validation_data=(X_test, y_test),
         callbacks=[model_checkpoint]  # Add the ModelCheckpoint callback
     )
@@ -161,24 +161,3 @@ best_model = models.load_model(checkpoint_path)
 # Evaluate the best model on the test data
 test_loss, test_accuracy = best_model.evaluate(X_test, y_test)
 print(f'\nBest Model Test Accuracy: {test_accuracy * 100:.2f}%')
-
-# Average Precision
-
-# Predict probabilities on the test set using the features
-y_probabilities = best_model.predict(X_test)
-
-# Calculate Average Precision for each class
-average_precisions = []
-for class_index in range(15):
-    true_labels_class = (y_test == class_index).astype(int)
-    predicted_scores_class = y_probabilities[:, class_index]
-
-    # Compute average precision for the current class
-    average_precision = average_precision_score(true_labels_class, predicted_scores_class)
-    average_precisions.append(average_precision)
-
-    print(f'Average Precision for class {class_index}: {average_precision:.4f}')
-
-# Calculate and print the mean Average Precision (mAP)
-mean_average_precision = np.mean(average_precisions)
-print(f'Mean Average Precision (mAP): {mean_average_precision:.4f}')
