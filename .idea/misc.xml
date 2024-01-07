@@ -3,5 +3,5 @@
   <component name="Black">
     <option name="sdkName" value="ComputerVision" />
   </component>
-  <component name="ProjectRootManager" version="2" project-jdk-name="ComputerVision" project-jdk-type="Python SDK" />
+  <component name="ProjectRootManager" version="2" project-jdk-name="Python 3.9 (Scene_Recognition)" project-jdk-type="Python SDK" />
 </project>
