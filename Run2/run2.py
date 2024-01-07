@@ -1,5 +1,4 @@
 import os
-import time
 import cv2
 from statistics import mode
 import numpy as np
@@ -221,22 +220,6 @@ def make_predictions(input_features, classifiers_for_each_label):
     # Return the list of prediction classes with maximum probability:
     return np.argmax(predictions_for_each_class, axis=1)
 
-
-# def write_predictions_to_file(predicted, file_names, label_encoder):
-#     """
-#         Function that writes final predictions to the run2.txt file, as instructed in specification
-#         :param predicted: list of predictions
-#         :param file_names: list of all file names from the testing dataset
-#         :param label_encoder: LabelEncoder object that was used to encode classes (will be used to decode labels
-#                               back to string format)
-#     """
-#     # Transform encoded labels back to string:
-#     string_predictions = label_encoder.inverse_transform(predicted)
-#
-#     # Write predictions and file names to the run2.txt file:
-#     with open("run2.txt", 'w') as output_file:
-#         for filename, prediction in zip(file_names, string_predictions):
-#             output_file.write(f"{filename} {prediction}\n")
 
 def write_predictions_to_file(predicted, file_names, label_encoder):
     """
