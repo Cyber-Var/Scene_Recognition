@@ -222,6 +222,22 @@ def make_predictions(input_features, classifiers_for_each_label):
     return np.argmax(predictions_for_each_class, axis=1)
 
 
+# def write_predictions_to_file(predicted, file_names, label_encoder):
+#     """
+#         Function that writes final predictions to the run2.txt file, as instructed in specification
+#         :param predicted: list of predictions
+#         :param file_names: list of all file names from the testing dataset
+#         :param label_encoder: LabelEncoder object that was used to encode classes (will be used to decode labels
+#                               back to string format)
+#     """
+#     # Transform encoded labels back to string:
+#     string_predictions = label_encoder.inverse_transform(predicted)
+#
+#     # Write predictions and file names to the run2.txt file:
+#     with open("run2.txt", 'w') as output_file:
+#         for filename, prediction in zip(file_names, string_predictions):
+#             output_file.write(f"{filename} {prediction}\n")
+
 def write_predictions_to_file(predicted, file_names, label_encoder):
     """
         Function that writes final predictions to the run2.txt file, as instructed in specification
@@ -233,9 +249,15 @@ def write_predictions_to_file(predicted, file_names, label_encoder):
     # Transform encoded labels back to string:
     string_predictions = label_encoder.inverse_transform(predicted)
 
+    # Combine file names, predictions, and sort based on numeric part of file names
+    predictions_sorted = sorted(
+        zip(file_names, string_predictions),
+        key=lambda x: int(''.join(filter(str.isdigit, os.path.basename(x[0]))))
+    )
+
     # Write predictions and file names to the run2.txt file:
     with open("run2.txt", 'w') as output_file:
-        for filename, prediction in zip(file_names, string_predictions):
+        for filename, prediction in predictions_sorted:
             output_file.write(f"{filename} {prediction}\n")
 
 
@@ -248,19 +270,19 @@ testing_filenames = [filename for image, filename in testing_data]
 check_size_and_scale([image for image, label in training_data], "Training")
 check_size_and_scale([image for image, filename in testing_data], "Testing")
 
-
 # Split the images into 5 by 5 patches, sampled every 5 pixels in the x and y directions:
 training_patches = [(split_image_into_patches(image, 7, 4), label) for image, label in training_data]
 testing_patches = [split_image_into_patches(image, 7, 4) for image, filename in testing_data]
 
 # Mean-center and normalize patches:
-training_mean_centered_normalized = [(normalize_and_mean_center_patches(patches), label) for patches, label in training_patches]
+training_mean_centered_normalized = [(normalize_and_mean_center_patches(patches), label) for patches, label in
+                                     training_patches]
 testing_mean_centered_normalized = [normalize_and_mean_center_patches(patches) for patches in testing_patches]
 
 # Flatten patches into vectors:
-training_vectors = [(flatten_patches_into_vector(patches), label) for patches, label in training_mean_centered_normalized]
+training_vectors = [(flatten_patches_into_vector(patches), label) for patches, label in
+                    training_mean_centered_normalized]
 testing_vectors = [flatten_patches_into_vector(patches) for patches in testing_mean_centered_normalized]
-
 
 # Apply K-Means clustering on training data to learn the visual vocabulary:
 vocabulary = learn_vocabulary(training_vectors)
@@ -270,16 +292,14 @@ training_quantized_words = [vector_quantisation(vector, vocabulary) for vector, 
 testing_quantized_words = [vector_quantisation(vector, vocabulary) for vector in testing_vectors]
 
 # Draw a histogram over the visual word counts for each image:
-bins = np.arange(len(vocabulary+1))
+bins = np.arange(len(vocabulary + 1))
 training_feature_vectors = [np.histogram(word, bins=bins, density=True)[0] for word in training_quantized_words]
 testing_feature_vectors = [np.histogram(word, bins=bins, density=True)[0] for word in testing_quantized_words]
-
 
 # Encode labels into numerical form:
 labels = [label.lower() for vector, label in training_vectors]
 encoder = LabelEncoder()
 labels_encoded = encoder.fit_transform(labels)
-
 
 # Split the training dataset (80% for training and 20% for testing) to evaluate the model's performance:
 X_train, X_test, y_train, y_test = train_test_split(training_feature_vectors, labels_encoded, test_size=0.2,
@@ -289,11 +309,9 @@ predictions_for_evaluation = make_predictions(X_test, classifiers_for_evaluation
 accuracy = accuracy_score(y_test, predictions_for_evaluation)
 print("Average Precision:", accuracy)
 
-
 # Train a new model on the full training dataset:
 one_vs_all_classifiers = train_classifiers(training_feature_vectors, labels_encoded)
 
-# TODO - put in order all the predictions
 # Make classification predictions on the testing set and write the results to run2.txt:
 final_predictions = make_predictions(testing_feature_vectors, one_vs_all_classifiers)
 write_predictions_to_file(final_predictions, testing_filenames, encoder)
